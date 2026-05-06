@@ -152,42 +152,26 @@ def get_stock_stats_indicators_window(
     # Optimized: Get stock data once and calculate indicators for all dates
     try:
         indicator_data = _get_stock_stats_bulk(symbol, indicator, curr_date, market=market)
-        
-        # Generate the date range we need
-        current_dt = curr_date_dt
-        date_values = []
-        
-        while current_dt >= before:
-            date_str = current_dt.strftime('%Y-%m-%d')
-            
-            # Look up the indicator value for this date
-            if date_str in indicator_data:
-                indicator_value = indicator_data[date_str]
-            else:
-                indicator_value = "N/A: Not a trading day (weekend or holiday)"
-            
-            date_values.append((date_str, indicator_value))
-            current_dt = current_dt - relativedelta(days=1)
-        
-        # Build the result string
-        ind_string = ""
-        for date_str, value in date_values:
-            ind_string += f"{date_str}: {value}\n"
-        
+        ind_string = _format_indicator_window(indicator_data, curr_date_dt, before)
     except Exception as e:
         print(f"Error getting bulk stockstats data: {e}")
-        # Fallback to original implementation if bulk method fails
-        ind_string = ""
-        curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-        while curr_date_dt >= before:
-            indicator_value = get_stockstats_indicator(
-                symbol,
-                indicator,
-                curr_date_dt.strftime("%Y-%m-%d"),
-                market=market,
-            )
-            ind_string += f"{curr_date_dt.strftime('%Y-%m-%d')}: {indicator_value}\n"
-            curr_date_dt = curr_date_dt - relativedelta(days=1)
+        try:
+            data = load_ohlcv(symbol, curr_date, market=market)
+            indicator_data = _indicator_values_from_data(data, indicator)
+            ind_string = _format_indicator_window(indicator_data, curr_date_dt, before)
+        except Exception as fallback_error:
+            print(f"Error getting fallback stockstats data: {fallback_error}")
+            ind_string = ""
+            curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+            while curr_date_dt >= before:
+                indicator_value = get_stockstats_indicator(
+                    symbol,
+                    indicator,
+                    curr_date_dt.strftime("%Y-%m-%d"),
+                    market=market,
+                )
+                ind_string += f"{curr_date_dt.strftime('%Y-%m-%d')}: {indicator_value}\n"
+                curr_date_dt = curr_date_dt - relativedelta(days=1)
 
     result_str = (
         f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {end_date}:\n\n"
@@ -197,6 +181,41 @@ def get_stock_stats_indicators_window(
     )
 
     return result_str
+
+
+def _format_indicator_window(indicator_data: dict, curr_date_dt: datetime, before: datetime) -> str:
+    current_dt = curr_date_dt
+    ind_string = ""
+
+    while current_dt >= before:
+        date_str = current_dt.strftime("%Y-%m-%d")
+        indicator_value = indicator_data.get(
+            date_str,
+            "N/A: Not a trading day (weekend or holiday)",
+        )
+        ind_string += f"{date_str}: {indicator_value}\n"
+        current_dt = current_dt - relativedelta(days=1)
+
+    return ind_string
+
+
+def _indicator_values_from_data(data: pd.DataFrame, indicator: str) -> dict:
+    from stockstats import wrap
+
+    df = wrap(data)
+    df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+    df[indicator]
+
+    result_dict = {}
+    for _, row in df.iterrows():
+        date_str = row["Date"]
+        indicator_value = row[indicator]
+        if pd.isna(indicator_value):
+            result_dict[date_str] = "N/A"
+        else:
+            result_dict[date_str] = str(indicator_value)
+
+    return result_dict
 
 
 def _get_stock_stats_bulk(
@@ -210,28 +229,8 @@ def _get_stock_stats_bulk(
     Fetches data once and calculates indicator for all available dates.
     Returns dict mapping date strings to indicator values.
     """
-    from stockstats import wrap
-
     data = load_ohlcv(symbol, curr_date, market=market)
-    df = wrap(data)
-    df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
-    
-    # Calculate the indicator for all rows at once
-    df[indicator]  # This triggers stockstats to calculate the indicator
-    
-    # Create a dictionary mapping date strings to indicator values
-    result_dict = {}
-    for _, row in df.iterrows():
-        date_str = row["Date"]
-        indicator_value = row[indicator]
-        
-        # Handle NaN/None values
-        if pd.isna(indicator_value):
-            result_dict[date_str] = "N/A"
-        else:
-            result_dict[date_str] = str(indicator_value)
-    
-    return result_dict
+    return _indicator_values_from_data(data, indicator)
 
 
 def get_stockstats_indicator(

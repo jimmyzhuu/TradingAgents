@@ -183,6 +183,8 @@ def get_global_news_yfinance(
                 # Skip articles published after curr_date (look-ahead guard)
                 if data.get("pub_date"):
                     pub_naive = data["pub_date"].replace(tzinfo=None) if hasattr(data["pub_date"], "replace") else data["pub_date"]
+                    if pub_naive < start_dt:
+                        continue
                     if pub_naive > curr_dt + relativedelta(days=1):
                         continue
                 title = data["title"]

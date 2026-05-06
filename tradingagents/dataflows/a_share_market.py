@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 import os
 
 import akshare as ak
@@ -14,6 +15,7 @@ from .utils import safe_ticker_component
 
 _SUPPORTED_SH_PREFIXES = ("600", "601", "603", "605", "688")
 _SUPPORTED_SZ_PREFIXES = ("000", "001", "002", "003", "300")
+_A_SHARE_CACHE_YEARS = 5
 
 
 def _canonicalize_supported_symbol(symbol: str) -> str:
@@ -34,6 +36,11 @@ def _canonicalize_supported_symbol(symbol: str) -> str:
 
 def _plain_code(symbol: str) -> str:
     return symbol.split(".")[0]
+
+
+def _cache_start_from_end(end_date: str) -> str:
+    requested_end = pd.to_datetime(end_date)
+    return (requested_end - pd.DateOffset(years=_A_SHARE_CACHE_YEARS)).strftime("%Y-%m-%d")
 
 
 def _normalize_hist_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -79,21 +86,38 @@ def fetch_ohlcv(
     os.makedirs(resolved_cache_dir, exist_ok=True)
 
     safe_symbol = safe_ticker_component(canonical_symbol)
+    requested_end = pd.to_datetime(end_date)
+    cache_start = _cache_start_from_end(end_date)
     data_file = os.path.join(
         resolved_cache_dir,
-        f"{safe_symbol}-AShare-data-{adjust}-{start_date}-{end_date}.csv",
+        f"{safe_symbol}-AShare-data-{adjust}.csv",
+    )
+    metadata_file = os.path.join(
+        resolved_cache_dir,
+        f"{safe_symbol}-AShare-data-{adjust}.meta.json",
     )
 
     if os.path.exists(data_file):
-        return pd.read_csv(data_file, parse_dates=["Date"], encoding="utf-8")
+        cached = pd.read_csv(data_file, parse_dates=["Date"], encoding="utf-8")
+        start_dt = pd.to_datetime(start_date)
+        if not cached.empty and os.path.exists(metadata_file):
+            with open(metadata_file, encoding="utf-8") as fh:
+                metadata = json.load(fh)
+            cached_start = pd.to_datetime(metadata["cached_start"])
+            cached_end = pd.to_datetime(metadata["cached_end"])
+            if cached_start <= start_dt and cached_end >= requested_end:
+                return cached[(cached["Date"] >= start_dt) & (cached["Date"] <= requested_end)].copy()
 
     df = ak.stock_zh_a_hist(
         symbol=_plain_code(canonical_symbol),
         period="daily",
-        start_date=start_date.replace("-", ""),
+        start_date=cache_start.replace("-", ""),
         end_date=end_date.replace("-", ""),
         adjust=adjust,
     )
     normalized = _normalize_hist_frame(df)
     normalized.to_csv(data_file, index=False, encoding="utf-8")
-    return normalized
+    with open(metadata_file, "w", encoding="utf-8") as fh:
+        json.dump({"cached_start": cache_start, "cached_end": end_date}, fh)
+    start_dt = pd.to_datetime(start_date)
+    return normalized[(normalized["Date"] >= start_dt) & (normalized["Date"] <= requested_end)].copy()

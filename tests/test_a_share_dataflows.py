@@ -14,6 +14,7 @@ import tradingagents.dataflows.stockstats_utils as stockstats_utils
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.interface import route_to_vendor
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
+from tradingagents.dataflows.yfinance_news import get_global_news_yfinance
 
 
 def _ashare_hist_df():
@@ -111,6 +112,31 @@ class AShareMarketDataTests(unittest.TestCase):
         self.assertIn("2026-01-10: 55.5", text)
         self.assertEqual(mock_single.call_args.kwargs["market"], "cn_a")
 
+    @patch("tradingagents.dataflows.y_finance._get_stock_stats_bulk")
+    @patch("tradingagents.dataflows.a_share_market.ak.stock_zh_a_hist")
+    def test_get_indicators_fallback_reuses_cn_a_cache_across_dates(self, mock_hist, mock_bulk):
+        set_config(
+            {
+                "market": "us_equity",
+                "data_cache_dir": self.cache_dir,
+                "price_adjustment": "qfq",
+                "data_vendors": {
+                    "core_stock_apis": "yfinance",
+                    "technical_indicators": "a_share",
+                    "fundamental_data": "yfinance",
+                    "news_data": "yfinance",
+                },
+            }
+        )
+        mock_bulk.side_effect = RuntimeError("bulk unavailable")
+        mock_hist.return_value = _ashare_hist_df()
+
+        text = route_to_vendor("get_indicators", "600519.SH", "rsi", "2026-01-10", 1)
+
+        self.assertIn("2026-01-10:", text)
+        self.assertIn("2026-01-09:", text)
+        self.assertEqual(mock_hist.call_count, 1)
+
     @patch("tradingagents.dataflows.a_share_market.ak.stock_zh_a_hist")
     def test_load_ohlcv_cn_a_reuses_cache_for_same_symbol_and_window(self, mock_hist):
         mock_hist.return_value = _ashare_hist_df()
@@ -165,6 +191,49 @@ class AShareMarketDataTests(unittest.TestCase):
 
         self.assertEqual(cleaned["Date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-01-05"])
         self.assertEqual(cleaned.iloc[0]["Open"], 101.0)
+
+
+@pytest.mark.unit
+class YFinanceNewsTests(unittest.TestCase):
+    @patch("tradingagents.dataflows.yfinance_news.yf_retry", side_effect=lambda func: func())
+    @patch("tradingagents.dataflows.yfinance_news._load_yfinance")
+    def test_get_global_news_respects_lookback_lower_bound(self, mock_load_yf, _mock_retry):
+        class FakeSearchResult:
+            def __init__(self, news):
+                self.news = news
+
+        class FakeYFinance:
+            @staticmethod
+            def Search(**kwargs):
+                return FakeSearchResult(
+                    [
+                        {
+                            "content": {
+                                "title": "In Range Article",
+                                "summary": "recent",
+                                "provider": {"displayName": "TestWire"},
+                                "canonicalUrl": {"url": "https://example.com/recent"},
+                                "pubDate": "2026-01-05T12:00:00Z",
+                            }
+                        },
+                        {
+                            "content": {
+                                "title": "Too Old Article",
+                                "summary": "old",
+                                "provider": {"displayName": "TestWire"},
+                                "canonicalUrl": {"url": "https://example.com/old"},
+                                "pubDate": "2026-01-01T12:00:00Z",
+                            }
+                        },
+                    ]
+                )
+
+        mock_load_yf.return_value = FakeYFinance
+
+        text = get_global_news_yfinance("2026-01-10", look_back_days=7, limit=10)
+
+        self.assertIn("In Range Article", text)
+        self.assertNotIn("Too Old Article", text)
 
 
 if __name__ == "__main__":
