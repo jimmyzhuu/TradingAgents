@@ -1,13 +1,7 @@
 import unittest
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from cli import utils as cli_utils
 from cli.utils import normalize_ticker_symbol
