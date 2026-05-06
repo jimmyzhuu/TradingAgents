@@ -83,6 +83,30 @@ class AShareMarketDataTests(unittest.TestCase):
         self.assertIn("2026-01-10: 55.5", text)
         self.assertEqual(mock_bulk.call_args.kwargs["market"], "cn_a")
 
+    @patch("tradingagents.dataflows.y_finance.get_stockstats_indicator")
+    @patch("tradingagents.dataflows.y_finance._get_stock_stats_bulk")
+    def test_get_indicators_fallback_preserves_cn_a_market_override(self, mock_bulk, mock_single):
+        set_config(
+            {
+                "market": "us_equity",
+                "data_cache_dir": self.cache_dir,
+                "price_adjustment": "qfq",
+                "data_vendors": {
+                    "core_stock_apis": "yfinance",
+                    "technical_indicators": "a_share",
+                    "fundamental_data": "yfinance",
+                    "news_data": "yfinance",
+                },
+            }
+        )
+        mock_bulk.side_effect = RuntimeError("bulk unavailable")
+        mock_single.return_value = "55.5"
+
+        text = route_to_vendor("get_indicators", "600519.SH", "rsi", "2026-01-10", 0)
+
+        self.assertIn("2026-01-10: 55.5", text)
+        self.assertEqual(mock_single.call_args.kwargs["market"], "cn_a")
+
     @patch("tradingagents.dataflows.a_share_market.ak.stock_zh_a_hist")
     def test_load_ohlcv_cn_a_reuses_cache_for_same_symbol_and_window(self, mock_hist):
         mock_hist.return_value = _ashare_hist_df()

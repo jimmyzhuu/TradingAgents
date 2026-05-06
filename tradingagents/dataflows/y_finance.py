@@ -171,7 +171,10 @@ def get_stock_stats_indicators_window(
         curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
         while curr_date_dt >= before:
             indicator_value = get_stockstats_indicator(
-                symbol, indicator, curr_date_dt.strftime("%Y-%m-%d")
+                symbol,
+                indicator,
+                curr_date_dt.strftime("%Y-%m-%d"),
+                market=market,
             )
             ind_string += f"{curr_date_dt.strftime('%Y-%m-%d')}: {indicator_value}\n"
             curr_date_dt = curr_date_dt - relativedelta(days=1)
@@ -227,6 +230,7 @@ def get_stockstats_indicator(
     curr_date: Annotated[
         str, "The current trading date you are trading on, YYYY-mm-dd"
     ],
+    market: Annotated[str | None, "optional market override for OHLCV source"] = None,
 ) -> str:
 
     curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
@@ -237,6 +241,7 @@ def get_stockstats_indicator(
             symbol,
             indicator,
             curr_date,
+            market=market,
         )
     except Exception as e:
         print(
