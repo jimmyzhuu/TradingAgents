@@ -11,6 +11,11 @@ DEFAULT_CONFIG = {
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Market defaults
+    "market": "us_equity",
+    "benchmark_symbol": "SPY",
+    "calendar_code": "XNYS",
+    "price_adjustment": "qfq",
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.4",

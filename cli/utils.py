@@ -4,7 +4,7 @@ from rich.console import Console
 
 from cli.models import AnalystType
 from tradingagents.llm_clients.model_catalog import get_model_options
-from tradingagents.markets.profiles import canonicalize_ticker
+from tradingagents.markets.profiles import MARKET_PROFILES, canonicalize_ticker
 
 console = Console()
 
@@ -30,11 +30,49 @@ def _questionary():
     return questionary
 
 
-def get_ticker() -> str:
+def get_ticker_input_examples(market: str) -> str:
+    examples = {
+        "us_equity": "Examples: SPY, NVDA, BRK.B, CNC.TO",
+        "hk_equity": "Examples: 0700.HK, 9988.HK, 2318.HK",
+        "cn_a": "Examples: 600519.SH, 000001.SZ, 300750.SZ, 430047.BJ",
+    }
+    return examples.get(market, examples["us_equity"])
+
+
+def get_default_output_language(market: str) -> str:
+    return "Chinese" if market == "cn_a" else "English"
+
+
+def select_market() -> str:
+    """Select the market to analyze."""
+    questionary = _questionary()
+    choice = questionary.select(
+        "Select Market:",
+        choices=[
+            questionary.Choice(profile.display_name, value=market)
+            for market, profile in MARKET_PROFILES.items()
+        ],
+        style=questionary.Style(
+            [
+                ("selected", "fg:green noinherit"),
+                ("highlighted", "fg:green noinherit"),
+                ("pointer", "fg:green noinherit"),
+            ]
+        ),
+    ).ask()
+
+    if choice is None:
+        console.print("\n[red]No market selected. Exiting...[/red]")
+        exit(1)
+
+    return choice
+
+
+def get_ticker(market: str = "us_equity") -> str:
     """Prompt the user to enter a ticker symbol."""
     questionary = _questionary()
     ticker = questionary.text(
-        f"Enter the exact ticker symbol to analyze ({TICKER_INPUT_EXAMPLES}):",
+        f"Enter the exact ticker symbol to analyze ({get_ticker_input_examples(market)}):",
         validate=lambda x: len(x.strip()) > 0 or "Please enter a valid ticker symbol.",
         style=questionary.Style(
             [
@@ -48,7 +86,7 @@ def get_ticker() -> str:
         console.print("\n[red]No ticker symbol provided. Exiting...[/red]")
         exit(1)
 
-    return normalize_ticker_symbol(ticker)
+    return normalize_ticker_symbol(ticker, market=market)
 
 
 def normalize_ticker_symbol(ticker: str, market: str = "us_equity") -> str:
@@ -350,14 +388,33 @@ def ask_gemini_thinking_config() -> str | None:
     ).ask()
 
 
-def ask_output_language() -> str:
+def ask_output_language(default: str = "English") -> str:
     """Ask for report output language."""
     questionary = _questionary()
+    default_choice = default if default in {
+        "English",
+        "Chinese",
+        "Japanese",
+        "Korean",
+        "Hindi",
+        "Spanish",
+        "Portuguese",
+        "French",
+        "German",
+        "Arabic",
+        "Russian",
+    } else "English"
     choice = questionary.select(
         "Select Output Language:",
         choices=[
-            questionary.Choice("English (default)", "English"),
-            questionary.Choice("Chinese (中文)", "Chinese"),
+            questionary.Choice(
+                "English (default)" if default_choice == "English" else "English",
+                "English",
+            ),
+            questionary.Choice(
+                "Chinese (中文, default)" if default_choice == "Chinese" else "Chinese (中文)",
+                "Chinese",
+            ),
             questionary.Choice("Japanese (日本語)", "Japanese"),
             questionary.Choice("Korean (한국어)", "Korean"),
             questionary.Choice("Hindi (हिन्दी)", "Hindi"),
@@ -374,6 +431,7 @@ def ask_output_language() -> str:
             ("highlighted", "fg:yellow noinherit"),
             ("pointer", "fg:yellow noinherit"),
         ]),
+        default=default_choice,
     ).ask()
 
     if choice == "custom":
