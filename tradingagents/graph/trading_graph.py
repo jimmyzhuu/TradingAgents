@@ -356,6 +356,7 @@ class TradingAgentsGraph:
             ticker=company_name,
             trade_date=trade_date,
             final_trade_decision=final_state["final_trade_decision"],
+            benchmark_symbol=self.config.get("benchmark_symbol", "SPY"),
         )
 
         # Clear checkpoint on successful completion to avoid stale state.

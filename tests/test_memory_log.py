@@ -607,7 +607,7 @@ class TestDeferredReflection:
 
         pending = log.get_pending_entries()
         assert len(pending) == 1
-        assert pending[0]["benchmark"] == "QQQ"
+        assert pending[0]["benchmark_symbol"] == "QQQ"
 
         mock_llm = MagicMock()
         mock_llm.invoke.return_value.content = "Benchmark-aware reflection."
@@ -643,7 +643,7 @@ class TestDeferredReflection:
         assert len(entries) == 1
         assert entries[0]["pending"] is False
         assert entries[0]["alpha"] == "+5.0%"
-        assert entries[0]["benchmark"] == "QQQ"
+        assert entries[0]["benchmark_symbol"] is None
 
         messages = mock_llm.invoke.call_args[0][0]
         human_content = next(content for role, content in messages if role == "human")
