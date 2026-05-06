@@ -19,7 +19,13 @@ ANALYST_ORDER = [
 
 
 def _questionary():
-    import questionary
+    try:
+        import questionary
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Optional CLI dependency 'questionary' is not installed. "
+            "Install the CLI extras or add 'questionary' to use interactive prompts."
+        ) from exc
 
     return questionary
 

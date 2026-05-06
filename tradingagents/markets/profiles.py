@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True)
@@ -65,17 +66,36 @@ def get_market_profile(market: str) -> MarketProfile:
 
 
 def canonicalize_ticker(ticker: str, market: str) -> str:
+    get_market_profile(market)
     cleaned = ticker.strip().upper()
     if market != "cn_a":
         return cleaned
+
+    code = cleaned
     if "." in cleaned:
-        return cleaned
-    if len(cleaned) != 6 or not cleaned.isdigit():
+        parts = cleaned.split(".")
+        if len(parts) != 2:
+            raise ValueError(f"Expected a mainland ticker in CODE.SUFFIX form, got {ticker!r}")
+        code, suffix = parts
+        if not re.fullmatch(r"\d{6}", code):
+            raise ValueError(f"Expected a 6-digit mainland security code, got {ticker!r}")
+        expected_suffix = _infer_cn_a_suffix(code, ticker)
+        if suffix != expected_suffix:
+            raise ValueError(
+                f"Expected mainland code {ticker!r} to use .{expected_suffix} suffix"
+            )
+        return f"{code}.{suffix}"
+
+    if not re.fullmatch(r"\d{6}", code):
         raise ValueError(f"Expected a 6-digit mainland security code, got {ticker!r}")
-    if cleaned.startswith(("6", "5")):
-        return f"{cleaned}.SH"
-    if cleaned.startswith(("0", "1", "2", "3")):
-        return f"{cleaned}.SZ"
-    if cleaned.startswith(("4", "8")) or cleaned.startswith("92"):
-        return f"{cleaned}.BJ"
-    raise ValueError(f"Could not infer exchange suffix for mainland code {ticker!r}")
+    return f"{code}.{_infer_cn_a_suffix(code, ticker)}"
+
+
+def _infer_cn_a_suffix(code: str, original_ticker: str) -> str:
+    if code.startswith(("6", "5")):
+        return "SH"
+    if code.startswith(("0", "1", "2", "3")):
+        return "SZ"
+    if code.startswith(("4", "8")) or code.startswith("92"):
+        return "BJ"
+    raise ValueError(f"Could not infer exchange suffix for mainland code {original_ticker!r}")
