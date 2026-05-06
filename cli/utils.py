@@ -241,8 +241,10 @@ def select_deep_thinking_agent(provider) -> str:
     """Select deep thinking llm engine using an interactive selection."""
     return _select_model(provider, "deep")
 
+
 def select_llm_provider() -> tuple[str, str | None]:
     """Select the LLM provider and its API endpoint."""
+    questionary = _questionary()
     # (display_name, provider_key, base_url)
     PROVIDERS = [
         ("OpenAI", "openai", "https://api.openai.com/v1"),
@@ -283,6 +285,7 @@ def select_llm_provider() -> tuple[str, str | None]:
 
 def ask_openai_reasoning_effort() -> str:
     """Ask for OpenAI reasoning effort level."""
+    questionary = _questionary()
     choices = [
         questionary.Choice("Medium (Default)", "medium"),
         questionary.Choice("High (More thorough)", "high"),
@@ -304,6 +307,7 @@ def ask_anthropic_effort() -> str | None:
 
     Controls token usage and response thoroughness on Claude 4.5+ and 4.6 models.
     """
+    questionary = _questionary()
     return questionary.select(
         "Select Effort Level:",
         choices=[
@@ -325,6 +329,7 @@ def ask_gemini_thinking_config() -> str | None:
     Returns thinking_level: "high" or "minimal".
     Client maps to appropriate API param based on model series.
     """
+    questionary = _questionary()
     return questionary.select(
         "Select Thinking Mode:",
         choices=[
@@ -341,6 +346,7 @@ def ask_gemini_thinking_config() -> str | None:
 
 def ask_output_language() -> str:
     """Ask for report output language."""
+    questionary = _questionary()
     choice = questionary.select(
         "Select Output Language:",
         choices=[
