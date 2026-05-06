@@ -69,6 +69,7 @@ def load_ohlcv(symbol: str, curr_date: str, market: str | None = None) -> pd.Dat
             start_date=start_date,
             end_date=end_date,
             adjust=config.get("price_adjustment", "qfq"),
+            cache_dir=config["data_cache_dir"],
         )
         return data[data["Date"] <= curr_date_dt]
 

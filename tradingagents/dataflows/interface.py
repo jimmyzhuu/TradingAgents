@@ -67,6 +67,21 @@ VENDOR_LIST = [
     "a_share",
 ]
 
+
+def _get_a_share_indicators(
+    symbol: Annotated[str, "ticker symbol of the company"],
+    indicator: Annotated[str, "technical indicator to get the analysis and report of"],
+    curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
+    look_back_days: Annotated[int, "how many days to look back"],
+):
+    return get_stock_stats_indicators_window(
+        symbol,
+        indicator,
+        curr_date,
+        look_back_days,
+        market="cn_a",
+    )
+
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
     # core_stock_apis
@@ -79,7 +94,7 @@ VENDOR_METHODS = {
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "a_share": get_stock_stats_indicators_window,
+        "a_share": _get_a_share_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
