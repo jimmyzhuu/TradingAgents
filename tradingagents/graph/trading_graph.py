@@ -117,7 +117,10 @@ class TradingAgentsGraph:
         )
 
         self.propagator = Propagator()
-        self.reflector = Reflector(self.quick_thinking_llm)
+        self.reflector = Reflector(
+            self.quick_thinking_llm,
+            benchmark_label=self.config.get("benchmark_symbol", "SPY"),
+        )
         self.signal_processor = SignalProcessor(self.quick_thinking_llm)
 
         # State tracking
@@ -203,21 +206,25 @@ class TradingAgentsGraph:
             end_str = end.strftime("%Y-%m-%d")
 
             stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+            config = getattr(self, "config", {}) or {}
+            benchmark_symbol = config.get("benchmark_symbol", "SPY")
+            benchmark_data = yf.Ticker(benchmark_symbol).history(
+                start=trade_date, end=end_str
+            )
 
-            if len(stock) < 2 or len(spy) < 2:
+            if len(stock) < 2 or len(benchmark_data) < 2:
                 return None, None, None
 
-            actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
+            actual_days = min(holding_days, len(stock) - 1, len(benchmark_data) - 1)
             raw = float(
                 (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
                 / stock["Close"].iloc[0]
             )
-            spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
+            benchmark_ret = float(
+                (benchmark_data["Close"].iloc[actual_days] - benchmark_data["Close"].iloc[0])
+                / benchmark_data["Close"].iloc[0]
             )
-            alpha = raw - spy_ret
+            alpha = raw - benchmark_ret
             return raw, alpha, actual_days
         except Exception as e:
             logger.warning(
