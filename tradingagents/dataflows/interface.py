@@ -1,31 +1,9 @@
+from __future__ import annotations
+
+from importlib import import_module
 from typing import Annotated
 
-# Import from vendor-specific modules
-from .y_finance import (
-    get_YFin_data_online,
-    get_stock_stats_indicators_window,
-    get_fundamentals as get_yfinance_fundamentals,
-    get_balance_sheet as get_yfinance_balance_sheet,
-    get_cashflow as get_yfinance_cashflow,
-    get_income_statement as get_yfinance_income_statement,
-    get_insider_transactions as get_yfinance_insider_transactions,
-)
-from .yfinance_news import get_news_yfinance, get_global_news_yfinance
-from .alpha_vantage import (
-    get_stock as get_alpha_vantage_stock,
-    get_indicator as get_alpha_vantage_indicator,
-    get_fundamentals as get_alpha_vantage_fundamentals,
-    get_balance_sheet as get_alpha_vantage_balance_sheet,
-    get_cashflow as get_alpha_vantage_cashflow,
-    get_income_statement as get_alpha_vantage_income_statement,
-    get_insider_transactions as get_alpha_vantage_insider_transactions,
-    get_news as get_alpha_vantage_news,
-    get_global_news as get_alpha_vantage_global_news,
-)
-from .a_share_market import get_stock as get_a_share_stock
 from .alpha_vantage_common import AlphaVantageRateLimitError
-
-# Configuration and routing logic
 from .config import get_config
 
 # Tools organized by category
@@ -68,13 +46,48 @@ VENDOR_LIST = [
 ]
 
 
+def _load_yfinance_module():
+    return import_module("tradingagents.dataflows.y_finance")
+
+
+def _load_yfinance_news_module():
+    return import_module("tradingagents.dataflows.yfinance_news")
+
+
+def _load_alpha_vantage_module():
+    return import_module("tradingagents.dataflows.alpha_vantage")
+
+
+def _load_a_share_market_module():
+    return import_module("tradingagents.dataflows.a_share_market")
+
+
+def _call_module_func(loader, func_name: str, *args, **kwargs):
+    module = loader()
+    return getattr(module, func_name)(*args, **kwargs)
+
+
+def _get_yfinance_stock_data(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_YFin_data_online", *args, **kwargs)
+
+
+def _get_yfinance_indicators(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_stock_stats_indicators_window", *args, **kwargs)
+
+
+def _get_a_share_stock(*args, **kwargs):
+    return _call_module_func(_load_a_share_market_module, "get_stock", *args, **kwargs)
+
+
 def _get_a_share_indicators(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
     curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
     look_back_days: Annotated[int, "how many days to look back"],
 ):
-    return get_stock_stats_indicators_window(
+    return _call_module_func(
+        _load_yfinance_module,
+        "get_stock_stats_indicators_window",
         symbol,
         indicator,
         curr_date,
@@ -82,51 +95,117 @@ def _get_a_share_indicators(
         market="cn_a",
     )
 
+
+def _get_yfinance_fundamentals(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_fundamentals", *args, **kwargs)
+
+
+def _get_yfinance_balance_sheet(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_balance_sheet", *args, **kwargs)
+
+
+def _get_yfinance_cashflow(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_cashflow", *args, **kwargs)
+
+
+def _get_yfinance_income_statement(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_income_statement", *args, **kwargs)
+
+
+def _get_yfinance_insider_transactions(*args, **kwargs):
+    return _call_module_func(_load_yfinance_module, "get_insider_transactions", *args, **kwargs)
+
+
+def _get_alpha_vantage_stock(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_stock", *args, **kwargs)
+
+
+def _get_alpha_vantage_indicator(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_indicator", *args, **kwargs)
+
+
+def _get_alpha_vantage_fundamentals(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_fundamentals", *args, **kwargs)
+
+
+def _get_alpha_vantage_balance_sheet(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_balance_sheet", *args, **kwargs)
+
+
+def _get_alpha_vantage_cashflow(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_cashflow", *args, **kwargs)
+
+
+def _get_alpha_vantage_income_statement(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_income_statement", *args, **kwargs)
+
+
+def _get_alpha_vantage_news(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_news", *args, **kwargs)
+
+
+def _get_alpha_vantage_global_news(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_global_news", *args, **kwargs)
+
+
+def _get_alpha_vantage_insider_transactions(*args, **kwargs):
+    return _call_module_func(_load_alpha_vantage_module, "get_insider_transactions", *args, **kwargs)
+
+
+def _get_yfinance_news(*args, **kwargs):
+    return _call_module_func(_load_yfinance_news_module, "get_news_yfinance", *args, **kwargs)
+
+
+def _get_yfinance_global_news(*args, **kwargs):
+    return _call_module_func(_load_yfinance_news_module, "get_global_news_yfinance", *args, **kwargs)
+
+
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
-        "alpha_vantage": get_alpha_vantage_stock,
-        "yfinance": get_YFin_data_online,
-        "a_share": get_a_share_stock,
+        "alpha_vantage": _get_alpha_vantage_stock,
+        "yfinance": _get_yfinance_stock_data,
+        "a_share": _get_a_share_stock,
     },
     # technical_indicators
     "get_indicators": {
-        "alpha_vantage": get_alpha_vantage_indicator,
-        "yfinance": get_stock_stats_indicators_window,
+        "alpha_vantage": _get_alpha_vantage_indicator,
+        "yfinance": _get_yfinance_indicators,
         "a_share": _get_a_share_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
-        "alpha_vantage": get_alpha_vantage_fundamentals,
-        "yfinance": get_yfinance_fundamentals,
+        "alpha_vantage": _get_alpha_vantage_fundamentals,
+        "yfinance": _get_yfinance_fundamentals,
     },
     "get_balance_sheet": {
-        "alpha_vantage": get_alpha_vantage_balance_sheet,
-        "yfinance": get_yfinance_balance_sheet,
+        "alpha_vantage": _get_alpha_vantage_balance_sheet,
+        "yfinance": _get_yfinance_balance_sheet,
     },
     "get_cashflow": {
-        "alpha_vantage": get_alpha_vantage_cashflow,
-        "yfinance": get_yfinance_cashflow,
+        "alpha_vantage": _get_alpha_vantage_cashflow,
+        "yfinance": _get_yfinance_cashflow,
     },
     "get_income_statement": {
-        "alpha_vantage": get_alpha_vantage_income_statement,
-        "yfinance": get_yfinance_income_statement,
+        "alpha_vantage": _get_alpha_vantage_income_statement,
+        "yfinance": _get_yfinance_income_statement,
     },
     # news_data
     "get_news": {
-        "alpha_vantage": get_alpha_vantage_news,
-        "yfinance": get_news_yfinance,
+        "alpha_vantage": _get_alpha_vantage_news,
+        "yfinance": _get_yfinance_news,
     },
     "get_global_news": {
-        "yfinance": get_global_news_yfinance,
-        "alpha_vantage": get_alpha_vantage_global_news,
+        "yfinance": _get_yfinance_global_news,
+        "alpha_vantage": _get_alpha_vantage_global_news,
     },
     "get_insider_transactions": {
-        "alpha_vantage": get_alpha_vantage_insider_transactions,
-        "yfinance": get_yfinance_insider_transactions,
+        "alpha_vantage": _get_alpha_vantage_insider_transactions,
+        "yfinance": _get_yfinance_insider_transactions,
     },
 }
+
 
 def get_category_for_method(method: str) -> str:
     """Get the category that contains the specified method."""
@@ -134,6 +213,7 @@ def get_category_for_method(method: str) -> str:
         if method in info["tools"]:
             return category
     raise ValueError(f"Method '{method}' not found in any category")
+
 
 def get_vendor(category: str, method: str = None) -> str:
     """Get the configured vendor for a data category or specific tool method.
@@ -149,6 +229,7 @@ def get_vendor(category: str, method: str = None) -> str:
 
     # Fall back to category-level configuration
     return config.get("data_vendors", {}).get(category, "default")
+
 
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""

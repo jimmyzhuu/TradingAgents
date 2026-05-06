@@ -2,9 +2,18 @@ from typing import Annotated
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
-import yfinance as yf
 import os
 from .stockstats_utils import StockstatsUtils, _clean_dataframe, yf_retry, load_ohlcv, filter_financials_by_date
+
+
+def _load_yfinance():
+    try:
+        import yfinance as yf_module
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "yfinance is required for the configured Yahoo Finance data paths"
+        ) from exc
+    return yf_module
 
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
@@ -14,6 +23,7 @@ def get_YFin_data_online(
 
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
+    yf = _load_yfinance()
 
     # Create ticker object
     ticker = yf.Ticker(symbol.upper())
@@ -258,6 +268,7 @@ def get_fundamentals(
 ):
     """Get company fundamentals overview from yfinance."""
     try:
+        yf = _load_yfinance()
         ticker_obj = yf.Ticker(ticker.upper())
         info = yf_retry(lambda: ticker_obj.info)
 
@@ -316,6 +327,7 @@ def get_balance_sheet(
 ):
     """Get balance sheet data from yfinance."""
     try:
+        yf = _load_yfinance()
         ticker_obj = yf.Ticker(ticker.upper())
 
         if freq.lower() == "quarterly":
@@ -348,6 +360,7 @@ def get_cashflow(
 ):
     """Get cash flow data from yfinance."""
     try:
+        yf = _load_yfinance()
         ticker_obj = yf.Ticker(ticker.upper())
 
         if freq.lower() == "quarterly":
@@ -380,6 +393,7 @@ def get_income_statement(
 ):
     """Get income statement data from yfinance."""
     try:
+        yf = _load_yfinance()
         ticker_obj = yf.Ticker(ticker.upper())
 
         if freq.lower() == "quarterly":
@@ -410,6 +424,7 @@ def get_insider_transactions(
 ):
     """Get insider transactions data from yfinance."""
     try:
+        yf = _load_yfinance()
         ticker_obj = yf.Ticker(ticker.upper())
         data = yf_retry(lambda: ticker_obj.insider_transactions)
         

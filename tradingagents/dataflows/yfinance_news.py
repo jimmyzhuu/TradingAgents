@@ -1,10 +1,19 @@
 """yfinance-based news data fetching functions."""
 
-import yfinance as yf
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from .stockstats_utils import yf_retry
+
+
+def _load_yfinance():
+    try:
+        import yfinance as yf_module
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "yfinance is required for the configured Yahoo Finance news paths"
+        ) from exc
+    return yf_module
 
 
 def _extract_article_data(article: dict) -> dict:
@@ -65,6 +74,7 @@ def get_news_yfinance(
         Formatted string containing news articles
     """
     try:
+        yf = _load_yfinance()
         stock = yf.Ticker(ticker)
         news = yf_retry(lambda: stock.get_news(count=20))
 
@@ -132,6 +142,7 @@ def get_global_news_yfinance(
     seen_titles = set()
 
     try:
+        yf = _load_yfinance()
         for query in search_queries:
             search = yf_retry(lambda q=query: yf.Search(
                 query=q,

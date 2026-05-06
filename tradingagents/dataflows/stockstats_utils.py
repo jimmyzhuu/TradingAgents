@@ -2,8 +2,6 @@ import time
 import logging
 
 import pandas as pd
-import yfinance as yf
-from yfinance.exceptions import YFRateLimitError
 from stockstats import wrap
 from typing import Annotated
 import os
@@ -14,6 +12,17 @@ from .utils import safe_ticker_component
 logger = logging.getLogger(__name__)
 
 
+def _load_yfinance():
+    try:
+        import yfinance as yf_module
+        from yfinance.exceptions import YFRateLimitError as rate_limit_error
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "yfinance is required for the configured Yahoo Finance data paths"
+        ) from exc
+    return yf_module, rate_limit_error
+
+
 def yf_retry(func, max_retries=3, base_delay=2.0):
     """Execute a yfinance call with exponential backoff on rate limits.
 
@@ -21,10 +30,11 @@ def yf_retry(func, max_retries=3, base_delay=2.0):
     retry them internally. This wrapper adds retry logic specifically
     for rate limits. Other exceptions propagate immediately.
     """
+    _, yfinance_rate_limit_error = _load_yfinance()
     for attempt in range(max_retries + 1):
         try:
             return func()
-        except YFRateLimitError:
+        except yfinance_rate_limit_error:
             if attempt < max_retries:
                 delay = base_delay * (2 ** attempt)
                 logger.warning(f"Yahoo Finance rate limited, retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries})")
@@ -41,7 +51,8 @@ def _clean_dataframe(data: pd.DataFrame) -> pd.DataFrame:
     price_cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in data.columns]
     data[price_cols] = data[price_cols].apply(pd.to_numeric, errors="coerce")
     data = data.dropna(subset=["Close"])
-    data[price_cols] = data[price_cols].ffill().bfill()
+    data[price_cols] = data[price_cols].ffill()
+    data = data.dropna(subset=price_cols)
 
     return data
 
@@ -88,6 +99,7 @@ def load_ohlcv(symbol: str, curr_date: str, market: str | None = None) -> pd.Dat
     if os.path.exists(data_file):
         data = pd.read_csv(data_file, on_bad_lines="skip", encoding="utf-8")
     else:
+        yf, _ = _load_yfinance()
         data = yf_retry(lambda: yf.download(
             symbol,
             start=start_str,

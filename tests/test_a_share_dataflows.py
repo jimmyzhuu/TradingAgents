@@ -1,3 +1,5 @@
+import builtins
+import importlib
 import shutil
 import tempfile
 import unittest
@@ -7,6 +9,8 @@ import pandas as pd
 import pytest
 
 from tradingagents.dataflows import a_share_market
+import tradingagents.dataflows.interface as data_interface
+import tradingagents.dataflows.stockstats_utils as stockstats_utils
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.interface import route_to_vendor
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
@@ -124,6 +128,43 @@ class AShareMarketDataTests(unittest.TestCase):
     def test_fetch_ohlcv_rejects_unsupported_mainland_symbol_category(self):
         with self.assertRaisesRegex(ValueError, "Unsupported cn_a instrument"):
             a_share_market.fetch_ohlcv("510300", "2026-01-01", "2026-01-10")
+
+    def test_interface_reload_and_a_share_route_do_not_require_yfinance(self):
+        original_import = builtins.__import__
+
+        def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "yfinance" or name.startswith("yfinance."):
+                raise ModuleNotFoundError("No module named 'yfinance'")
+            return original_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=guarded_import):
+            reloaded_stockstats = importlib.reload(stockstats_utils)
+            reloaded_interface = importlib.reload(data_interface)
+            self.assertTrue(hasattr(reloaded_stockstats, "load_ohlcv"))
+            with patch("tradingagents.dataflows.a_share_market.ak.stock_zh_a_hist") as mock_hist:
+                mock_hist.return_value = _ashare_hist_df()
+                text = reloaded_interface.route_to_vendor(
+                    "get_stock_data", "600519.SH", "2026-01-01", "2026-01-10"
+                )
+
+        self.assertIn("# Stock data for 600519.SH", text)
+
+    def test_clean_dataframe_does_not_backfill_from_future_rows(self):
+        raw = pd.DataFrame(
+            {
+                "Date": ["2026-01-02", "2026-01-05"],
+                "Open": [None, 101.0],
+                "High": [None, 103.0],
+                "Low": [None, 100.0],
+                "Close": [101.0, 102.0],
+                "Volume": [None, 110000],
+            }
+        )
+
+        cleaned = stockstats_utils._clean_dataframe(raw)
+
+        self.assertEqual(cleaned["Date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-01-05"])
+        self.assertEqual(cleaned.iloc[0]["Open"], 101.0)
 
 
 if __name__ == "__main__":
