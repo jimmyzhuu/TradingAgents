@@ -1,10 +1,10 @@
-import questionary
 from typing import List, Optional, Tuple, Dict
 
 from rich.console import Console
 
 from cli.models import AnalystType
 from tradingagents.llm_clients.model_catalog import get_model_options
+from tradingagents.markets.profiles import canonicalize_ticker
 
 console = Console()
 
@@ -18,8 +18,15 @@ ANALYST_ORDER = [
 ]
 
 
+def _questionary():
+    import questionary
+
+    return questionary
+
+
 def get_ticker() -> str:
     """Prompt the user to enter a ticker symbol."""
+    questionary = _questionary()
     ticker = questionary.text(
         f"Enter the exact ticker symbol to analyze ({TICKER_INPUT_EXAMPLES}):",
         validate=lambda x: len(x.strip()) > 0 or "Please enter a valid ticker symbol.",
@@ -38,15 +45,16 @@ def get_ticker() -> str:
     return normalize_ticker_symbol(ticker)
 
 
-def normalize_ticker_symbol(ticker: str) -> str:
+def normalize_ticker_symbol(ticker: str, market: str = "us_equity") -> str:
     """Normalize ticker input while preserving exchange suffixes."""
-    return ticker.strip().upper()
+    return canonicalize_ticker(ticker, market)
 
 
 def get_analysis_date() -> str:
     """Prompt the user to enter a date in YYYY-MM-DD format."""
     import re
     from datetime import datetime
+    questionary = _questionary()
 
     def validate_date(date_str: str) -> bool:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
@@ -78,6 +86,7 @@ def get_analysis_date() -> str:
 
 def select_analysts() -> List[AnalystType]:
     """Select analysts using an interactive checkbox."""
+    questionary = _questionary()
     choices = questionary.checkbox(
         "Select Your [Analysts Team]:",
         choices=[
@@ -104,6 +113,7 @@ def select_analysts() -> List[AnalystType]:
 
 def select_research_depth() -> int:
     """Select research depth using an interactive selection."""
+    questionary = _questionary()
 
     # Define research depth options with their corresponding values
     DEPTH_OPTIONS = [
@@ -149,6 +159,7 @@ def _fetch_openrouter_models() -> List[Tuple[str, str]]:
 
 def select_openrouter_model() -> str:
     """Select an OpenRouter model from the newest available, or enter a custom ID."""
+    questionary = _questionary()
     models = _fetch_openrouter_models()
 
     choices = [questionary.Choice(name, value=mid) for name, mid in models[:5]]
@@ -176,6 +187,7 @@ def select_openrouter_model() -> str:
 
 def _prompt_custom_model_id() -> str:
     """Prompt user to type a custom model ID."""
+    questionary = _questionary()
     return questionary.text(
         "Enter model ID:",
         validate=lambda x: len(x.strip()) > 0 or "Please enter a model ID.",
@@ -184,6 +196,7 @@ def _prompt_custom_model_id() -> str:
 
 def _select_model(provider: str, mode: str) -> str:
     """Select a model for the given provider and mode (quick/deep)."""
+    questionary = _questionary()
     if provider.lower() == "openrouter":
         return select_openrouter_model()
 
