@@ -22,6 +22,7 @@ from .alpha_vantage import (
     get_news as get_alpha_vantage_news,
     get_global_news as get_alpha_vantage_global_news,
 )
+from .a_share_market import get_stock as get_a_share_stock
 from .alpha_vantage_common import AlphaVantageRateLimitError
 
 # Configuration and routing logic
@@ -63,6 +64,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "a_share",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -71,11 +73,13 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "a_share": get_a_share_stock,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "a_share": get_stock_stats_indicators_window,
     },
     # fundamental_data
     "get_fundamentals": {

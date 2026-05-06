@@ -7,6 +7,7 @@ from yfinance.exceptions import YFRateLimitError
 from stockstats import wrap
 from typing import Annotated
 import os
+from .a_share_market import fetch_ohlcv as fetch_ohlcv_cn_a
 from .config import get_config
 from .utils import safe_ticker_component
 
@@ -45,7 +46,7 @@ def _clean_dataframe(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
+def load_ohlcv(symbol: str, curr_date: str, market: str | None = None) -> pd.DataFrame:
     """Fetch OHLCV data with caching, filtered to prevent look-ahead bias.
 
     Downloads 15 years of data up to today and caches per symbol. On
@@ -57,7 +58,19 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     safe_symbol = safe_ticker_component(symbol)
 
     config = get_config()
+    selected_market = market or config.get("market", "us_equity")
     curr_date_dt = pd.to_datetime(curr_date)
+
+    if selected_market == "cn_a":
+        start_date = (curr_date_dt - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
+        end_date = curr_date_dt.strftime("%Y-%m-%d")
+        data = fetch_ohlcv_cn_a(
+            symbol,
+            start_date=start_date,
+            end_date=end_date,
+            adjust=config.get("price_adjustment", "qfq"),
+        )
+        return data[data["Date"] <= curr_date_dt]
 
     # Cache uses a fixed window (15y to today) so one file per symbol
     today_date = pd.Timestamp.today()
