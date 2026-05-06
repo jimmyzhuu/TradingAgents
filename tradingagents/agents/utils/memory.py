@@ -16,6 +16,12 @@ class TradingMemoryLog:
     _DECISION_RE = re.compile(r"DECISION:\n(.*?)(?=\nREFLECTION:|\Z)", re.DOTALL)
     _REFLECTION_RE = re.compile(r"REFLECTION:\n(.*?)$", re.DOTALL)
 
+    @staticmethod
+    def _parse_tag_fields(tag_line: str) -> list[str]:
+        if not (tag_line.startswith("[") and tag_line.endswith("]")):
+            return []
+        return [f.strip() for f in tag_line[1:-1].split("|")]
+
     def __init__(self, config: dict = None):
         cfg = config or {}
         self._log_path = None
@@ -33,6 +39,7 @@ class TradingMemoryLog:
         ticker: str,
         trade_date: str,
         final_trade_decision: str,
+        benchmark_symbol: str | None = None,
     ) -> None:
         """Append pending entry at end of propagate(). No LLM call."""
         if not self._log_path:
@@ -41,10 +48,17 @@ class TradingMemoryLog:
         if self._log_path.exists():
             raw = self._log_path.read_text(encoding="utf-8")
             for line in raw.splitlines():
-                if line.startswith(f"[{trade_date} | {ticker} |") and line.endswith("| pending]"):
+                fields = self._parse_tag_fields(line.strip())
+                if (
+                    len(fields) >= 4
+                    and fields[0] == trade_date
+                    and fields[1] == ticker
+                    and fields[3] == "pending"
+                ):
                     return
         rating = parse_rating(final_trade_decision)
-        tag = f"[{trade_date} | {ticker} | {rating} | pending]"
+        benchmark_suffix = f" | benchmark={benchmark_symbol}" if benchmark_symbol else ""
+        tag = f"[{trade_date} | {ticker} | {rating} | pending{benchmark_suffix}]"
         entry = f"{tag}\n\nDECISION:\n{final_trade_decision}{self._SEPARATOR}"
         with open(self._log_path, "a", encoding="utf-8") as f:
             f.write(entry)
@@ -136,10 +150,11 @@ class TradingMemoryLog:
             if (
                 not updated
                 and tag_line.startswith(pending_prefix)
-                and tag_line.endswith("| pending]")
+                and len(self._parse_tag_fields(tag_line)) >= 4
+                and self._parse_tag_fields(tag_line)[3] == "pending"
             ):
                 # Parse rating from the existing pending tag
-                fields = [f.strip() for f in tag_line[1:-1].split("|")]
+                fields = self._parse_tag_fields(tag_line)
                 rating = fields[2]
                 new_tag = (
                     f"[{trade_date} | {ticker} | {rating}"
@@ -190,8 +205,12 @@ class TradingMemoryLog:
             matched = False
             for (trade_date, ticker), upd in list(update_map.items()):
                 pending_prefix = f"[{trade_date} | {ticker} |"
-                if tag_line.startswith(pending_prefix) and tag_line.endswith("| pending]"):
-                    fields = [f.strip() for f in tag_line[1:-1].split("|")]
+                fields = self._parse_tag_fields(tag_line)
+                if (
+                    tag_line.startswith(pending_prefix)
+                    and len(fields) >= 4
+                    and fields[3] == "pending"
+                ):
                     rating = fields[2]
                     raw_pct = f"{upd['raw_return']:+.1%}"
                     alpha_pct = f"{upd['alpha_return']:+.1%}"
@@ -235,11 +254,8 @@ class TradingMemoryLog:
                 decisions.append((block, False))
                 continue
             tag_line = stripped.splitlines()[0].strip()
-            is_resolved = (
-                tag_line.startswith("[")
-                and tag_line.endswith("]")
-                and not tag_line.endswith("| pending]")
-            )
+            fields = self._parse_tag_fields(tag_line)
+            is_resolved = bool(fields) and fields[3] != "pending"
             decisions.append((block, is_resolved))
 
         resolved_count = sum(1 for _, r in decisions if r)
@@ -262,7 +278,7 @@ class TradingMemoryLog:
         tag_line = lines[0].strip()
         if not (tag_line.startswith("[") and tag_line.endswith("]")):
             return None
-        fields = [f.strip() for f in tag_line[1:-1].split("|")]
+        fields = self._parse_tag_fields(tag_line)
         if len(fields) < 4:
             return None
         entry = {
@@ -273,7 +289,13 @@ class TradingMemoryLog:
             "raw": fields[3] if fields[3] != "pending" else None,
             "alpha": fields[4] if len(fields) > 4 else None,
             "holding": fields[5] if len(fields) > 5 else None,
+            "benchmark_symbol": None,
         }
+        if entry["pending"]:
+            for field in fields[4:]:
+                if field.startswith("benchmark="):
+                    entry["benchmark_symbol"] = field.split("=", 1)[1] or None
+                    break
         body = "\n".join(lines[1:]).strip()
         decision_match = self._DECISION_RE.search(body)
         reflection_match = self._REFLECTION_RE.search(body)

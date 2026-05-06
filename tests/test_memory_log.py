@@ -1,5 +1,6 @@
 """Tests for TradingMemoryLog — storage, deferred reflection, PM injection, legacy removal."""
 
+import functools
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
@@ -566,6 +567,88 @@ class TestDeferredReflection:
         assert entries[0]["reflection"] == "Momentum confirmed."
         assert "+5.0%" in entries[0]["raw"]
         assert "+2.0%" in entries[0]["alpha"]
+
+    def test_resolve_uses_benchmark_stored_with_pending_entry(self, tmp_path):
+        """Pending entries must resolve against the benchmark captured at decision time."""
+        log = make_log(tmp_path)
+        log.store_decision(
+            "NVDA",
+            "2026-01-05",
+            DECISION_BUY,
+            benchmark_symbol="000300.SH",
+        )
+        pending = log.get_pending_entries()
+        assert pending[0]["benchmark_symbol"] == "000300.SH"
+
+        mock_reflector = MagicMock()
+        mock_reflector.reflect_on_final_decision.return_value = "Benchmark-aware reflection."
+        mock_graph = MagicMock(spec=TradingAgentsGraph)
+        mock_graph.memory_log = log
+        mock_graph.reflector = mock_reflector
+        mock_graph.config = {"benchmark_symbol": "SPY"}
+        mock_graph._fetch_returns = MagicMock(return_value=(0.05, 0.02, 5))
+
+        TradingAgentsGraph._resolve_pending_entries(mock_graph, "NVDA")
+
+        mock_graph._fetch_returns.assert_called_once_with(
+            "NVDA",
+            "2026-01-05",
+            benchmark_symbol="000300.SH",
+        )
+        assert (
+            mock_reflector.reflect_on_final_decision.call_args.kwargs["benchmark_label"]
+            == "000300.SH"
+        )
+
+    def test_resolve_uses_stored_benchmark_not_current_graph_benchmark(self, tmp_path):
+        """A pending entry keeps its original benchmark for alpha and reflection labeling."""
+        log = make_log(tmp_path)
+        log.store_decision("NVDA", "2026-01-05", DECISION_BUY, benchmark_symbol="QQQ")
+
+        pending = log.get_pending_entries()
+        assert len(pending) == 1
+        assert pending[0]["benchmark"] == "QQQ"
+
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value.content = "Benchmark-aware reflection."
+        mock_graph = MagicMock(spec=TradingAgentsGraph)
+        mock_graph.memory_log = log
+        mock_graph.config = {"benchmark_symbol": "SPY"}
+        mock_graph.reflector = Reflector(mock_llm, benchmark_label="SPY")
+        mock_graph._fetch_returns = functools.partial(
+            TradingAgentsGraph._fetch_returns, mock_graph
+        )
+
+        stock_prices = [100.0, 110.0]
+        qqq_prices = [200.0, 210.0]
+        spy_prices = [400.0, 404.0]
+
+        with patch("yfinance.Ticker") as mock_ticker_cls:
+            def _make_ticker(sym):
+                ticker = MagicMock()
+                if sym == "NVDA":
+                    ticker.history.return_value = _price_df(stock_prices)
+                elif sym == "QQQ":
+                    ticker.history.return_value = _price_df(qqq_prices)
+                elif sym == "SPY":
+                    ticker.history.return_value = _price_df(spy_prices)
+                else:
+                    raise AssertionError(f"Unexpected ticker lookup: {sym}")
+                return ticker
+
+            mock_ticker_cls.side_effect = _make_ticker
+            TradingAgentsGraph._resolve_pending_entries(mock_graph, "NVDA")
+
+        entries = log.load_entries()
+        assert len(entries) == 1
+        assert entries[0]["pending"] is False
+        assert entries[0]["alpha"] == "+5.0%"
+        assert entries[0]["benchmark"] == "QQQ"
+
+        messages = mock_llm.invoke.call_args[0][0]
+        human_content = next(content for role, content in messages if role == "human")
+        assert "Alpha vs QQQ: +5.0%" in human_content
+        assert "Alpha vs SPY" not in human_content
 
 
 # ---------------------------------------------------------------------------

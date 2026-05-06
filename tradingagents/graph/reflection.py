@@ -34,6 +34,7 @@ class Reflector:
         final_decision: str,
         raw_return: float,
         alpha_return: float,
+        benchmark_label: str | None = None,
     ) -> str:
         """Single reflection call on the final trade decision with outcome context.
 
@@ -46,7 +47,7 @@ class Reflector:
                 "human",
                 (
                     f"Raw return: {raw_return:+.1%}\n"
-                    f"Alpha vs {self.benchmark_label}: {alpha_return:+.1%}\n\n"
+                    f"Alpha vs {benchmark_label or self.benchmark_label}: {alpha_return:+.1%}\n\n"
                     f"Final Decision:\n{final_decision}"
                 ),
             ),

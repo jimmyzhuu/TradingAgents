@@ -192,7 +192,11 @@ class TradingAgentsGraph:
         }
 
     def _fetch_returns(
-        self, ticker: str, trade_date: str, holding_days: int = 5
+        self,
+        ticker: str,
+        trade_date: str,
+        holding_days: int = 5,
+        benchmark_symbol: Optional[str] = None,
     ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
         """Fetch raw and alpha return for ticker over holding_days from trade_date.
 
@@ -207,8 +211,10 @@ class TradingAgentsGraph:
 
             stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
             config = getattr(self, "config", {}) or {}
-            benchmark_symbol = config.get("benchmark_symbol", "SPY")
-            benchmark_data = yf.Ticker(benchmark_symbol).history(
+            resolved_benchmark_symbol = benchmark_symbol or config.get(
+                "benchmark_symbol", "SPY"
+            )
+            benchmark_data = yf.Ticker(resolved_benchmark_symbol).history(
                 start=trade_date, end=end_str
             )
 
@@ -249,13 +255,19 @@ class TradingAgentsGraph:
 
         updates = []
         for entry in pending:
-            raw, alpha, days = self._fetch_returns(ticker, entry["date"])
+            entry_benchmark_symbol = entry.get("benchmark_symbol")
+            raw, alpha, days = self._fetch_returns(
+                ticker,
+                entry["date"],
+                benchmark_symbol=entry_benchmark_symbol,
+            )
             if raw is None:
                 continue  # price not available yet — try again next run
             reflection = self.reflector.reflect_on_final_decision(
                 final_decision=entry.get("decision", ""),
                 raw_return=raw,
                 alpha_return=alpha,
+                benchmark_label=entry_benchmark_symbol,
             )
             updates.append({
                 "ticker": ticker,
