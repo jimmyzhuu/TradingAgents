@@ -89,8 +89,9 @@ class AShareMarketDataTests(unittest.TestCase):
         self.assertEqual(mock_bulk.call_args.kwargs["market"], "cn_a")
 
     @patch("tradingagents.dataflows.y_finance.get_stockstats_indicator")
+    @patch("tradingagents.dataflows.y_finance.load_ohlcv")
     @patch("tradingagents.dataflows.y_finance._get_stock_stats_bulk")
-    def test_get_indicators_fallback_preserves_cn_a_market_override(self, mock_bulk, mock_single):
+    def test_get_indicators_fallback_preserves_cn_a_market_override(self, mock_bulk, mock_load_ohlcv, mock_single):
         set_config(
             {
                 "market": "us_equity",
@@ -105,6 +106,7 @@ class AShareMarketDataTests(unittest.TestCase):
             }
         )
         mock_bulk.side_effect = RuntimeError("bulk unavailable")
+        mock_load_ohlcv.side_effect = RuntimeError("cached reload unavailable")
         mock_single.return_value = "55.5"
 
         text = route_to_vendor("get_indicators", "600519.SH", "rsi", "2026-01-10", 0)
