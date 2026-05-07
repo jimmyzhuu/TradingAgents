@@ -3,6 +3,9 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Annotated
 
+import tradingagents.dataflows.a_share_fundamentals
+import tradingagents.dataflows.a_share_news
+
 from .alpha_vantage_common import AlphaVantageRateLimitError
 from .config import get_config
 
@@ -35,6 +38,7 @@ TOOLS_CATEGORIES = {
             "get_news",
             "get_global_news",
             "get_insider_transactions",
+            "get_company_announcements",
         ]
     }
 }
@@ -60,6 +64,14 @@ def _load_alpha_vantage_module():
 
 def _load_a_share_market_module():
     return import_module("tradingagents.dataflows.a_share_market")
+
+
+def _load_a_share_fundamentals_module():
+    return import_module("tradingagents.dataflows.a_share_fundamentals")
+
+
+def _load_a_share_news_module():
+    return import_module("tradingagents.dataflows.a_share_news")
 
 
 def _call_module_func(loader, func_name: str, *args, **kwargs):
@@ -112,6 +124,22 @@ def _get_yfinance_income_statement(*args, **kwargs):
     return _call_module_func(_load_yfinance_module, "get_income_statement", *args, **kwargs)
 
 
+def _get_a_share_fundamentals(*args, **kwargs):
+    return _call_module_func(_load_a_share_fundamentals_module, "get_a_share_fundamentals", *args, **kwargs)
+
+
+def _get_a_share_balance_sheet(*args, **kwargs):
+    return _call_module_func(_load_a_share_fundamentals_module, "get_a_share_balance_sheet", *args, **kwargs)
+
+
+def _get_a_share_cashflow(*args, **kwargs):
+    return _call_module_func(_load_a_share_fundamentals_module, "get_a_share_cashflow", *args, **kwargs)
+
+
+def _get_a_share_income_statement(*args, **kwargs):
+    return _call_module_func(_load_a_share_fundamentals_module, "get_a_share_income_statement", *args, **kwargs)
+
+
 def _get_yfinance_insider_transactions(*args, **kwargs):
     return _call_module_func(_load_yfinance_module, "get_insider_transactions", *args, **kwargs)
 
@@ -160,6 +188,18 @@ def _get_yfinance_global_news(*args, **kwargs):
     return _call_module_func(_load_yfinance_news_module, "get_global_news_yfinance", *args, **kwargs)
 
 
+def _get_a_share_news(*args, **kwargs):
+    return _call_module_func(_load_a_share_news_module, "get_a_share_news", *args, **kwargs)
+
+
+def _get_a_share_global_news(*args, **kwargs):
+    return _call_module_func(_load_a_share_news_module, "get_a_share_global_news", *args, **kwargs)
+
+
+def _get_a_share_company_announcements(*args, **kwargs):
+    return _call_module_func(_load_a_share_news_module, "get_a_share_company_announcements", *args, **kwargs)
+
+
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
     # core_stock_apis
@@ -178,31 +218,40 @@ VENDOR_METHODS = {
     "get_fundamentals": {
         "alpha_vantage": _get_alpha_vantage_fundamentals,
         "yfinance": _get_yfinance_fundamentals,
+        "a_share": _get_a_share_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": _get_alpha_vantage_balance_sheet,
         "yfinance": _get_yfinance_balance_sheet,
+        "a_share": _get_a_share_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": _get_alpha_vantage_cashflow,
         "yfinance": _get_yfinance_cashflow,
+        "a_share": _get_a_share_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": _get_alpha_vantage_income_statement,
         "yfinance": _get_yfinance_income_statement,
+        "a_share": _get_a_share_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": _get_alpha_vantage_news,
         "yfinance": _get_yfinance_news,
+        "a_share": _get_a_share_news,
     },
     "get_global_news": {
         "yfinance": _get_yfinance_global_news,
         "alpha_vantage": _get_alpha_vantage_global_news,
+        "a_share": _get_a_share_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": _get_alpha_vantage_insider_transactions,
         "yfinance": _get_yfinance_insider_transactions,
+    },
+    "get_company_announcements": {
+        "a_share": _get_a_share_company_announcements,
     },
 }
 

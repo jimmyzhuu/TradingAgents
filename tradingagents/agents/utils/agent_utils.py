@@ -16,7 +16,8 @@ from tradingagents.agents.utils.fundamental_data_tools import (
 from tradingagents.agents.utils.news_data_tools import (
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    get_company_announcements,
 )
 
 
@@ -39,7 +40,7 @@ def build_instrument_context(ticker: str) -> str:
     return (
         f"The instrument to analyze is `{ticker}`. "
         "Use this exact ticker in every tool call, report, and recommendation, "
-        "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`)."
+        "preserving any exchange suffix (e.g. `.SH`, `.SZ`, `.BJ`, `.HK`, `.TO`, `.L`, `.T`)."
     )
 
 def create_msg_delete():
