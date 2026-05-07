@@ -35,6 +35,23 @@ def get_language_instruction() -> str:
     return f" Write your entire response in {lang}."
 
 
+def get_market_rules_instruction() -> str:
+    """Return market-structure constraints the decision agents must respect."""
+    from tradingagents.dataflows.config import get_config
+
+    market = get_config().get("market", "us_equity")
+    if market != "cn_a":
+        return ""
+    return (
+        "\nA-share execution constraints to respect in every recommendation:\n"
+        "- Assume common shares are T+1 after a buy; do not rely on same-day exits.\n"
+        "- Do not recommend default short selling.\n"
+        "- Explicitly mention price-limit risk (10% main board, 20% ChiNext/STAR, 5% ST risk-warning names).\n"
+        "- Flag suspension, low liquidity, and disclosure risk when they matter.\n"
+        "- Prefer staged entries and explicit position sizing over all-in execution assumptions.\n"
+    )
+
+
 def build_instrument_context(ticker: str) -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
     return (

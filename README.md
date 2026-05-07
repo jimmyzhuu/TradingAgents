@@ -220,6 +220,37 @@ print(decision)
 
 See `tradingagents/default_config.py` for all configuration options.
 
+### China A-Share Usage
+
+TradingAgents can also be configured for mainland China A shares by enabling the `cn_a` market profile and the `a_share` data vendor.
+
+```python
+from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.default_config import DEFAULT_CONFIG
+
+config = DEFAULT_CONFIG.copy()
+config.update(
+    {
+        "market": "cn_a",
+        "benchmark_symbol": "000300.SH",
+        "calendar_code": "XSHG",
+        "output_language": "Chinese",
+        "data_vendors": {
+            "core_stock_apis": "a_share",
+            "technical_indicators": "a_share",
+            "fundamental_data": "a_share",
+            "news_data": "a_share",
+        },
+    }
+)
+
+ta = TradingAgentsGraph(debug=True, config=config)
+_, decision = ta.propagate("600519.SH", "2026-03-28")
+print(decision)
+```
+
+Current A-share support focuses on research and simulation workflows. Exchange-filed announcements, mainland trading calendars, benchmark-aware reflections, and A-share execution constraints are wired into the system, but this is still not a production brokerage integration.
+
 ## Persistence and Recovery
 
 TradingAgents persists two kinds of state across runs.

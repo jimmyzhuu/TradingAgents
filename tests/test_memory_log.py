@@ -484,6 +484,14 @@ class TestDeferredReflection:
         assert "-5.0%" in human_content
         assert "Exit position immediately." in human_content
 
+    def test_reflector_prompt_uses_custom_benchmark_label(self):
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="Reflection.")
+        reflector = Reflector(mock_llm, benchmark_label="000300.SH")
+        reflector.reflect_on_final_decision("Rating: Buy", 0.04, 0.01)
+        human_content = mock_llm.invoke.call_args.args[0][1][1]
+        assert "Alpha vs 000300.SH" in human_content
+
     # TradingAgentsGraph._fetch_returns
 
     def test_fetch_returns_valid_ticker(self):

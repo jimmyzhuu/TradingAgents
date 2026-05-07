@@ -1,3 +1,5 @@
+import builtins
+import importlib
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +12,7 @@ from tradingagents.agents.analysts.news_analyst import create_news_analyst
 from tradingagents.agents.analysts.social_media_analyst import create_social_media_analyst
 from tradingagents.agents.utils.news_data_tools import get_company_announcements
 from tradingagents.dataflows.config import set_config
+import tradingagents.dataflows.interface as data_interface
 from tradingagents.dataflows.interface import TOOLS_CATEGORIES, route_to_vendor
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
@@ -156,6 +159,30 @@ class AShareResearchDataTests(unittest.TestCase):
 
             self.assertTrue(expected_tool_names.issubset(tool_names))
             self.assertIn(expected_text, prompt_text)
+
+    def test_interface_reload_without_a_share_usage_does_not_require_akshare(self):
+        original_import = builtins.__import__
+
+        def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "akshare" or name.startswith("akshare."):
+                raise ModuleNotFoundError("No module named 'akshare'")
+            return original_import(name, globals, locals, fromlist, level)
+
+        set_config(
+            {
+                "market": "us_equity",
+                "data_vendors": {
+                    "core_stock_apis": "yfinance",
+                    "technical_indicators": "yfinance",
+                    "fundamental_data": "yfinance",
+                    "news_data": "yfinance",
+                },
+            }
+        )
+
+        with patch("builtins.__import__", side_effect=guarded_import):
+            reloaded_interface = importlib.reload(data_interface)
+            self.assertTrue(hasattr(reloaded_interface, "route_to_vendor"))
 
 
 if __name__ == "__main__":

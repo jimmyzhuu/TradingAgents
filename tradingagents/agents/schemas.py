@@ -136,6 +136,10 @@ class TraderProposal(BaseModel):
         default=None,
         description="Optional sizing guidance, e.g. '5% of portfolio'.",
     )
+    execution_constraints: Optional[str] = Field(
+        default=None,
+        description="Market-rule-aware execution notes such as T+1, price limits, lot size, or suspension risk.",
+    )
 
 
 def render_trader_proposal(proposal: TraderProposal) -> str:
@@ -156,6 +160,8 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
         parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
     if proposal.position_sizing:
         parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
+    if proposal.execution_constraints:
+        parts.extend(["", f"**Execution Constraints**: {proposal.execution_constraints}"])
     parts.extend([
         "",
         f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}**",
@@ -204,6 +210,10 @@ class PortfolioDecision(BaseModel):
         default=None,
         description="Optional recommended holding period, e.g. '3-6 months'.",
     )
+    market_constraints: Optional[str] = Field(
+        default=None,
+        description="Explicit market-structure constraints such as T+1, price limits, suspension risk, or board-specific rules.",
+    )
 
 
 def render_pm_decision(decision: PortfolioDecision) -> str:
@@ -225,4 +235,6 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+    if decision.market_constraints:
+        parts.extend(["", f"**Market Constraints**: {decision.market_constraints}"])
     return "\n".join(parts)

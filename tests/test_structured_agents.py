@@ -13,10 +13,12 @@ import pytest
 
 from tradingagents.agents.managers.research_manager import create_research_manager
 from tradingagents.agents.schemas import (
+    PortfolioDecision,
     PortfolioRating,
     ResearchPlan,
     TraderAction,
     TraderProposal,
+    render_pm_decision,
     render_research_plan,
     render_trader_proposal,
 )
@@ -62,6 +64,16 @@ class TestRenderTraderProposal:
         assert "Position Sizing" not in md
         assert "FINAL TRANSACTION PROPOSAL: **SELL**" in md
 
+    def test_a_share_execution_constraints_render_when_present(self):
+        p = TraderProposal(
+            action=TraderAction.BUY,
+            reasoning="Breakout confirmed with volume.",
+            position_sizing="4% of portfolio",
+            execution_constraints="A shares are T+1; avoid buying names already pinned near limit-up.",
+        )
+        md = render_trader_proposal(p)
+        assert "**Execution Constraints**: A shares are T+1;" in md
+
 
 @pytest.mark.unit
 class TestRenderResearchPlan:
@@ -85,6 +97,19 @@ class TestRenderResearchPlan:
             )
             md = render_research_plan(p)
             assert f"**Recommendation**: {rating.value}" in md
+
+
+@pytest.mark.unit
+class TestRenderPortfolioDecision:
+    def test_market_constraints_render_when_present(self):
+        decision = PortfolioDecision(
+            rating=PortfolioRating.HOLD,
+            executive_summary="Build only after a pullback.",
+            investment_thesis="Valuation is reasonable but liquidity and policy risk remain elevated.",
+            market_constraints="Do not assume same-day exit after entry; flag suspension and price-limit risk.",
+        )
+        md = render_pm_decision(decision)
+        assert "**Market Constraints**: Do not assume same-day exit after entry;" in md
 
 
 # ---------------------------------------------------------------------------
