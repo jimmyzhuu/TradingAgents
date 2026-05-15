@@ -1,5 +1,7 @@
 import os
 
+from tradingagents.llm_clients.openai_base_url import get_openai_base_url_from_env
+
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 
 DEFAULT_CONFIG = {
@@ -53,3 +55,31 @@ DEFAULT_CONFIG = {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
 }
+
+
+def build_cn_a_runtime_config(overrides=None):
+    """Return the formal China A-share runtime preset.
+
+    The base DEFAULT_CONFIG stays market-agnostic. This helper provides the
+    production-oriented defaults for the A-share edition and allows callers to
+    override any field when needed.
+    """
+
+    config = DEFAULT_CONFIG.copy()
+    config["market"] = "cn_a"
+    config["benchmark_symbol"] = "000300.SH"
+    config["calendar_code"] = "XSHG"
+    config["output_language"] = "Chinese"
+    config["deep_think_llm"] = "gpt-5.4"
+    config["quick_think_llm"] = "gpt-5.4-mini"
+    config["openai_reasoning_effort"] = "high"
+    config["backend_url"] = get_openai_base_url_from_env()
+    config["data_vendors"] = {
+        "core_stock_apis": "a_share",
+        "technical_indicators": "a_share",
+        "fundamental_data": "a_share",
+        "news_data": "a_share",
+    }
+    if overrides:
+        config.update(overrides)
+    return config

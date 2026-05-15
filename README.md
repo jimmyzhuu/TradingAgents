@@ -99,8 +99,15 @@ TradingAgents supports multiple LLM providers. At minimum, configure the provide
 
 TradingAgents 支持多个大模型提供方。最少只需要配置你准备使用的那个提供方。
 
+If you use an OpenAI-compatible gateway instead of the default OpenAI endpoint,
+set `TRADINGAGENTS_OPENAI_BASE_URL` as well.
+
+如果你使用的是 OpenAI 兼容网关，而不是默认 OpenAI 官方端点，还需要额外设置
+`TRADINGAGENTS_OPENAI_BASE_URL`。
+
 ```bash
 export OPENAI_API_KEY=...
+export TRADINGAGENTS_OPENAI_BASE_URL=...
 export GOOGLE_API_KEY=...
 export ANTHROPIC_API_KEY=...
 export XAI_API_KEY=...
@@ -139,29 +146,22 @@ For A-share runs, the CLI will guide you through:
 ## Minimal A-Share Example / 最小 A 股示例
 
 ```python
-from tradingagents.default_config import DEFAULT_CONFIG
+from dotenv import load_dotenv
+
+from tradingagents.default_config import build_cn_a_runtime_config
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-config = DEFAULT_CONFIG.copy()
-config.update(
-    {
-        "market": "cn_a",
-        "benchmark_symbol": "000300.SH",
-        "calendar_code": "XSHG",
-        "output_language": "Chinese",
-        "data_vendors": {
-            "core_stock_apis": "a_share",
-            "technical_indicators": "a_share",
-            "fundamental_data": "a_share",
-            "news_data": "a_share",
-        },
-    }
-)
+load_dotenv()
 
+config = build_cn_a_runtime_config()
 ta = TradingAgentsGraph(debug=True, config=config)
 _, decision = ta.propagate("600519.SH", "2026-03-28")
 print(decision)
 ```
+
+This preset is the formal default runtime path for the A-share edition.
+
+这套预设就是 A 股版本的正式默认运行配置。
 
 ## Architecture Notes / 架构说明
 

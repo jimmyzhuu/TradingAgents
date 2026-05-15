@@ -1,8 +1,10 @@
+import os
 from typing import List, Optional, Tuple, Dict
 
 from rich.console import Console
 
 from cli.models import AnalystType
+from tradingagents.llm_clients.openai_base_url import get_openai_base_url_from_env
 from tradingagents.llm_clients.model_catalog import get_model_options
 from tradingagents.markets.profiles import MARKET_PROFILES, canonicalize_ticker
 
@@ -17,6 +19,69 @@ ANALYST_ORDER = [
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
 ]
 
+LLM_PROVIDERS = [
+    {
+        "display": "OpenAI",
+        "key": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "env_keys": ("OPENAI_API_KEY",),
+    },
+    {
+        "display": "Google",
+        "key": "google",
+        "base_url": None,
+        "env_keys": ("GOOGLE_API_KEY",),
+    },
+    {
+        "display": "Anthropic",
+        "key": "anthropic",
+        "base_url": "https://api.anthropic.com/",
+        "env_keys": ("ANTHROPIC_API_KEY",),
+    },
+    {
+        "display": "xAI",
+        "key": "xai",
+        "base_url": "https://api.x.ai/v1",
+        "env_keys": ("XAI_API_KEY",),
+    },
+    {
+        "display": "DeepSeek",
+        "key": "deepseek",
+        "base_url": "https://api.deepseek.com",
+        "env_keys": ("DEEPSEEK_API_KEY",),
+    },
+    {
+        "display": "Qwen",
+        "key": "qwen",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "env_keys": ("DASHSCOPE_API_KEY",),
+    },
+    {
+        "display": "GLM",
+        "key": "glm",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        "env_keys": ("ZHIPU_API_KEY",),
+    },
+    {
+        "display": "OpenRouter",
+        "key": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "env_keys": ("OPENROUTER_API_KEY",),
+    },
+    {
+        "display": "Azure OpenAI",
+        "key": "azure",
+        "base_url": None,
+        "env_keys": ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"),
+    },
+    {
+        "display": "Ollama",
+        "key": "ollama",
+        "base_url": "http://localhost:11434/v1",
+        "env_keys": (),
+    },
+]
+
 
 def _questionary():
     try:
@@ -28,6 +93,43 @@ def _questionary():
         ) from exc
 
     return questionary
+
+
+def _has_required_env_keys(env_keys: Tuple[str, ...]) -> bool:
+    return all(os.getenv(env_key, "").strip() for env_key in env_keys)
+
+
+def _ollama_enabled() -> bool:
+    return os.getenv("TRADINGAGENTS_ENABLE_OLLAMA", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def get_configured_llm_providers() -> List[Dict[str, object]]:
+    configured = []
+    for provider in LLM_PROVIDERS:
+        if provider["key"] == "ollama":
+            if _ollama_enabled():
+                configured.append(provider)
+            continue
+
+        if _has_required_env_keys(provider["env_keys"]):
+            configured.append(_provider_with_runtime_overrides(provider))
+
+    return configured
+
+
+def _provider_with_runtime_overrides(provider: Dict[str, object]) -> Dict[str, object]:
+    if provider["key"] == "openai":
+        gateway_url = get_openai_base_url_from_env()
+        if gateway_url:
+            overridden = provider.copy()
+            overridden["base_url"] = gateway_url
+            return overridden
+    return provider
 
 
 def get_ticker_input_examples(market: str) -> str:
@@ -288,26 +390,31 @@ def select_deep_thinking_agent(provider) -> str:
 
 def select_llm_provider() -> tuple[str, str | None]:
     """Select the LLM provider and its API endpoint."""
+    available_providers = get_configured_llm_providers()
+
+    if len(available_providers) == 1:
+        provider = available_providers[0]
+        return provider["key"], provider["base_url"]
+
+    if not available_providers:
+        console.print(
+            "\n[yellow]No configured provider detected from environment variables. "
+            "Showing the full provider list.[/yellow]"
+        )
+        available_providers = [
+            _provider_with_runtime_overrides(provider) for provider in LLM_PROVIDERS
+        ]
+
     questionary = _questionary()
-    # (display_name, provider_key, base_url)
-    PROVIDERS = [
-        ("OpenAI", "openai", "https://api.openai.com/v1"),
-        ("Google", "google", None),
-        ("Anthropic", "anthropic", "https://api.anthropic.com/"),
-        ("xAI", "xai", "https://api.x.ai/v1"),
-        ("DeepSeek", "deepseek", "https://api.deepseek.com"),
-        ("Qwen", "qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-        ("GLM", "glm", "https://open.bigmodel.cn/api/paas/v4/"),
-        ("OpenRouter", "openrouter", "https://openrouter.ai/api/v1"),
-        ("Azure OpenAI", "azure", None),
-        ("Ollama", "ollama", "http://localhost:11434/v1"),
-    ]
 
     choice = questionary.select(
         "Select your LLM Provider:",
         choices=[
-            questionary.Choice(display, value=(provider_key, url))
-            for display, provider_key, url in PROVIDERS
+            questionary.Choice(
+                provider["display"],
+                value=(provider["key"], provider["base_url"]),
+            )
+            for provider in available_providers
         ],
         instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
         style=questionary.Style(
